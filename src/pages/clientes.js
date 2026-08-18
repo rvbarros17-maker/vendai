@@ -1,4 +1,4 @@
-import { listenClientes, addCliente, registrarPagamento } from "../js/db.js";
+import { listenClientes, addCliente, updateCliente, registrarPagamento } from "../js/db.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -61,9 +61,14 @@ export function renderClientes(root) {
     overlay.innerHTML = `
       <div class="w-full max-w-md mx-auto bg-paper-raised rounded-t-3xl p-5">
         <div class="w-10 h-1 bg-line rounded-full mx-auto mb-4"></div>
-        <h2 class="font-display font-bold text-lg">${cliente.nome}</h2>
-        <p class="text-xs text-ink-soft mb-4">${cliente.telefone || "sem telefone"}</p>
-        <div class="bg-coral-light rounded-2xl p-4 mb-4 text-center">
+        <div class="flex items-start justify-between mb-1">
+          <div>
+            <h2 class="font-display font-bold text-lg">${cliente.nome}</h2>
+            <p class="text-xs text-ink-soft">${cliente.telefone || "sem telefone"}</p>
+          </div>
+          <button id="editar-cliente" class="text-xs text-teal font-medium underline shrink-0 mt-1">editar</button>
+        </div>
+        <div class="bg-coral-light rounded-2xl p-4 mb-4 mt-3 text-center">
           <div class="text-xs text-ink-soft mb-1">deve atualmente</div>
           <div class="font-display font-extrabold text-2xl tabular text-coral">R$ ${fmt(cliente.saldoDevedor)}</div>
         </div>
@@ -88,6 +93,10 @@ export function renderClientes(root) {
     document.body.appendChild(overlay);
 
     overlay.querySelector("#fechar").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#editar-cliente").addEventListener("click", () => {
+      overlay.remove();
+      abrirEdicaoCliente(cliente);
+    });
     overlay.querySelector("#pagar-total")?.addEventListener("click", () => {
       overlay.querySelector("#f-pagamento").value = cliente.saldoDevedor;
     });
@@ -99,6 +108,46 @@ export function renderClientes(root) {
       }
       await registrarPagamento(cliente.id, valor);
       overlay.remove();
+    });
+  }
+
+  function abrirEdicaoCliente(cliente) {
+    const overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 bg-ink/40 z-40 flex items-end";
+    overlay.innerHTML = `
+      <div class="w-full max-w-md mx-auto bg-paper-raised rounded-t-3xl p-5">
+        <div class="w-10 h-1 bg-line rounded-full mx-auto mb-4"></div>
+        <h2 class="font-display font-bold text-lg mb-4">Editar cliente</h2>
+        <label class="text-xs font-medium text-ink-soft">Nome</label>
+        <input id="f-nome" value="${cliente.nome || ""}" class="w-full border border-line rounded-xl px-3 py-2 mb-3 mt-1 bg-paper text-sm" placeholder="Nome do cliente" />
+        <label class="text-xs font-medium text-ink-soft">Telefone (opcional)</label>
+        <input id="f-telefone" value="${cliente.telefone || ""}" class="w-full border border-line rounded-xl px-3 py-2 mb-4 mt-1 bg-paper text-sm" placeholder="(00) 00000-0000" />
+        <div class="flex gap-2">
+          <button id="cancelar" class="tap flex-1 py-3 rounded-xl border border-line text-ink-soft font-medium">Cancelar</button>
+          <button id="salvar" class="tap flex-[2] py-3 rounded-xl bg-teal text-paper font-display font-bold">Salvar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#cancelar").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#salvar").addEventListener("click", async () => {
+      const nome = overlay.querySelector("#f-nome").value.trim();
+      const telefone = overlay.querySelector("#f-telefone").value.trim();
+      if (!nome) {
+        alert("Informe o nome.");
+        return;
+      }
+      const btn = overlay.querySelector("#salvar");
+      btn.textContent = "Salvando...";
+      btn.disabled = true;
+      try {
+        await updateCliente(cliente.id, { nome, telefone });
+        overlay.remove();
+      } catch (err) {
+        console.error(err);
+        alert("Não foi possível salvar: " + (err.message || err));
+        btn.textContent = "Salvar";
+        btn.disabled = false;
+      }
     });
   }
 

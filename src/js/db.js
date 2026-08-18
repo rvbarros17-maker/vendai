@@ -59,6 +59,10 @@ export function addCliente({ nome, telefone }) {
   });
 }
 
+export function updateCliente(id, data) {
+  return updateDoc(doc(db, "clientes", id), data);
+}
+
 // Registra um pagamento (abatimento) de fiado. Funciona offline: o
 // increment fica na fila local e é aplicado de verdade quando reconectar.
 // Além de abater o saldo do cliente, marca como "pago" as vendas fiado
