@@ -2,7 +2,7 @@ const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigit
 const formaLabel = { dinheiro: "Dinheiro", pix: "Pix", cartao: "Cartão", fiado: "Fiado" };
 
 // venda = { itens, subtotal, desconto, total, formaPagamento, clienteNome? }
-export function gerarTextoComprovante(venda, nomeLoja = "Vendaí") {
+export function gerarTextoComprovante(venda, nomeLoja = "Vendaí", chavePix = "") {
   const agora = new Date();
   const data = agora.toLocaleDateString("pt-BR");
   const hora = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -26,7 +26,12 @@ export function gerarTextoComprovante(venda, nomeLoja = "Vendaí") {
   linhas.push(`Pagamento: ${formaLabel[venda.formaPagamento] || venda.formaPagamento}`);
   if (venda.clienteNome) linhas.push(`Cliente: ${venda.clienteNome}`);
   linhas.push("--------------------------------");
-  linhas.push("Este não é um documento fiscal.");
+  if (chavePix) {
+    linhas.push("Chave Pix (copie e cole no banco):");
+    linhas.push(chavePix);
+  } else {
+    linhas.push("Este não é um documento fiscal.");
+  }
   linhas.push("Obrigado pela preferência!");
 
   return linhas.join("\n");
@@ -52,7 +57,7 @@ export function gerarTextoCardapio(produtosNaCaixa, nomeLoja = "Vendaí") {
   return linhas.join("\n");
 }
 
-export function imprimirComprovante(venda, nomeLoja = "Vendaí") {
+export function imprimirComprovante(venda, nomeLoja = "Vendaí", chavePix = "") {
   const agora = new Date();
   const data = agora.toLocaleDateString("pt-BR");
   const hora = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -93,7 +98,11 @@ export function imprimirComprovante(venda, nomeLoja = "Vendaí") {
     <div class="linha"><span>Pagamento</span><span>${formaLabel[venda.formaPagamento] || venda.formaPagamento}</span></div>
     ${venda.clienteNome ? `<div class="linha"><span>Cliente</span><span>${venda.clienteNome}</span></div>` : ""}
     <hr />
-    <div class="rodape">Este não é um documento fiscal.<br/>Obrigado pela preferência!</div>
+    <div class="rodape">${
+      chavePix
+        ? `Chave Pix (copie e cole):<br/><b>${chavePix}</b><br/>`
+        : "Este não é um documento fiscal.<br/>"
+    }Obrigado pela preferência!</div>
     <script>window.onload = () => { window.print(); }<\/script>
   </body>
   </html>`;

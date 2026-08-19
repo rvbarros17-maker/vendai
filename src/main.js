@@ -6,6 +6,7 @@ import { renderCaixa } from "./pages/caixa.js";
 import { renderLock } from "./pages/lock.js";
 import { mountStatusBadge } from "./js/status.js";
 import { ensureAnonAuth, isUnlockedLocally, lockDevice } from "./js/auth.js";
+import { getConfigLoja, salvarConfigLoja } from "./js/config.js";
 
 const routes = {
   "#venda": { render: renderVenda, label: "Venda", icon: iconCart },
@@ -29,6 +30,9 @@ function iconWallet(active) {
 function iconLock() {
   return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
 }
+function iconSettings() {
+  return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>`;
+}
 
 const app = document.getElementById("app");
 let routerAtivo = null;
@@ -43,6 +47,7 @@ function montarAppPrincipal() {
       <span class="font-display font-extrabold text-teal-dark tracking-tight">Vendaí</span>
       <div class="flex items-center gap-3">
         <div id="status-badge"></div>
+        <button id="btn-config" class="tap text-ink-soft" title="Configurações">${iconSettings()}</button>
         <button id="btn-bloquear" class="tap text-ink-soft" title="Bloquear">${iconLock()}</button>
       </div>
     </header>
@@ -55,6 +60,7 @@ function montarAppPrincipal() {
     lockDevice();
     montarTela();
   });
+  document.getElementById("btn-config").addEventListener("click", abrirConfiguracoes);
 
   const page = document.getElementById("page");
   const nav = document.getElementById("bottom-nav");
@@ -84,6 +90,49 @@ function montarAppPrincipal() {
 
   routerAtivo = router;
   router();
+}
+
+function abrirConfiguracoes() {
+  const overlay = document.createElement("div");
+  overlay.className = "fixed inset-0 bg-ink/40 z-50 flex items-end";
+  overlay.innerHTML = `
+    <div class="w-full max-w-md mx-auto bg-paper-raised rounded-t-3xl p-5">
+      <div class="w-10 h-1 bg-line rounded-full mx-auto mb-4"></div>
+      <h2 class="font-display font-bold text-lg mb-4">Configurações</h2>
+      <label class="text-xs font-medium text-ink-soft">Nome da loja</label>
+      <input id="f-nome-loja" class="w-full border border-line rounded-xl px-3 py-2 mb-3 mt-1 bg-paper text-sm" placeholder="Vendaí" />
+      <label class="text-xs font-medium text-ink-soft">Chave Pix</label>
+      <input id="f-chave-pix" class="w-full border border-line rounded-xl px-3 py-2 mb-1 mt-1 bg-paper text-sm" placeholder="CPF, e-mail, telefone ou chave aleatória" />
+      <p class="text-xs text-ink-soft mb-4">Aparece no comprovante, pronta pra cliente copiar e colar no banco.</p>
+      <div class="flex gap-2">
+        <button id="cancelar" class="tap flex-1 py-3 rounded-xl border border-line text-ink-soft font-medium">Cancelar</button>
+        <button id="salvar" class="tap flex-[2] py-3 rounded-xl bg-teal text-paper font-display font-bold">Salvar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  getConfigLoja().then((config) => {
+    overlay.querySelector("#f-nome-loja").value = config.nomeLoja || "";
+    overlay.querySelector("#f-chave-pix").value = config.chavePix || "";
+  });
+
+  overlay.querySelector("#cancelar").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#salvar").addEventListener("click", async () => {
+    const nomeLoja = overlay.querySelector("#f-nome-loja").value.trim() || "Vendaí";
+    const chavePix = overlay.querySelector("#f-chave-pix").value.trim();
+    const btn = overlay.querySelector("#salvar");
+    btn.textContent = "Salvando...";
+    btn.disabled = true;
+    try {
+      await salvarConfigLoja({ nomeLoja, chavePix });
+      overlay.remove();
+    } catch (err) {
+      console.error(err);
+      alert("Não foi possível salvar: " + (err.message || err));
+      btn.textContent = "Salvar";
+      btn.disabled = false;
+    }
+  });
 }
 
 function montarTela() {

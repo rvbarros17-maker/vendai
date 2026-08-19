@@ -1,5 +1,6 @@
 import { listenProdutos, listenClientes, registrarVenda, addCliente } from "../js/db.js";
 import { gerarTextoComprovante, compartilharWhatsApp, imprimirComprovante, gerarTextoCardapio } from "../js/comprovante.js";
+import { listenConfigLoja } from "../js/config.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -10,6 +11,7 @@ export function renderVenda(root) {
   let formaPagamento = "dinheiro";
   let clienteId = null;
   let desconto = 0;
+  let configLoja = { nomeLoja: "Vendaí", chavePix: "" };
 
   root.innerHTML = `
     <div class="flex-1 flex flex-col pb-24">
@@ -261,7 +263,7 @@ export function renderVenda(root) {
   }
 
   function abrirComprovante(venda) {
-    const texto = gerarTextoComprovante(venda);
+    const texto = gerarTextoComprovante(venda, configLoja.nomeLoja, configLoja.chavePix);
     const overlay = document.createElement("div");
     overlay.className = "fixed inset-0 bg-ink/40 z-40 flex items-end";
     overlay.innerHTML = `
@@ -272,6 +274,11 @@ export function renderVenda(root) {
           <h2 class="font-display font-bold text-lg">Venda registrada!</h2>
         </div>
         <pre class="tabular bg-paper border border-line rounded-xl p-3 text-xs whitespace-pre-wrap mb-4 max-h-64 overflow-y-auto">${texto}</pre>
+        ${
+          configLoja.chavePix
+            ? `<button id="btn-copiar-pix" class="tap w-full mb-2 py-2.5 rounded-xl bg-teal-light text-teal-dark text-sm font-medium">📋 Copiar chave Pix</button>`
+            : ""
+        }
         <div class="grid grid-cols-2 gap-2 mb-2">
           <button id="btn-whatsapp" class="tap py-3 rounded-xl border border-line text-sm font-medium flex items-center justify-center gap-1.5">
             📱 WhatsApp
@@ -284,11 +291,22 @@ export function renderVenda(root) {
       </div>`;
     document.body.appendChild(overlay);
 
+    overlay.querySelector("#btn-copiar-pix")?.addEventListener("click", async (e) => {
+      try {
+        await navigator.clipboard.writeText(configLoja.chavePix);
+        const btn = e.currentTarget;
+        const original = btn.textContent;
+        btn.textContent = "✓ Copiado!";
+        setTimeout(() => (btn.textContent = original), 1500);
+      } catch {
+        alert("Chave Pix: " + configLoja.chavePix);
+      }
+    });
     overlay.querySelector("#btn-whatsapp").addEventListener("click", () => {
       compartilharWhatsApp(texto, venda.clienteTelefone);
     });
     overlay.querySelector("#btn-imprimir").addEventListener("click", () => {
-      imprimirComprovante(venda);
+      imprimirComprovante(venda, configLoja.nomeLoja, configLoja.chavePix);
     });
     overlay.querySelector("#fechar-comprovante").addEventListener("click", () => overlay.remove());
   }
@@ -299,7 +317,7 @@ export function renderVenda(root) {
       alert("Nenhum produto com estoque na caixa agora. Carregue a caixa na aba Produtos primeiro.");
       return;
     }
-    const texto = gerarTextoCardapio(disponiveis);
+    const texto = gerarTextoCardapio(disponiveis, configLoja.nomeLoja);
     compartilharWhatsApp(texto);
   });
 
@@ -309,5 +327,8 @@ export function renderVenda(root) {
   });
   listenClientes((data) => {
     clientes = data;
+  });
+  listenConfigLoja((data) => {
+    configLoja = data;
   });
 }
