@@ -1,5 +1,5 @@
 import { listenProdutos, listenClientes, registrarVenda, addCliente } from "../js/db.js";
-import { gerarTextoComprovante, compartilharWhatsApp, imprimirComprovante } from "../js/comprovante.js";
+import { gerarTextoComprovante, compartilharWhatsApp, imprimirComprovante, gerarTextoCardapio } from "../js/comprovante.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -13,8 +13,9 @@ export function renderVenda(root) {
 
   root.innerHTML = `
     <div class="flex-1 flex flex-col pb-24">
-      <div class="px-5 pt-2 pb-3">
+      <div class="px-5 pt-2 pb-3 flex items-center justify-between">
         <h1 class="font-display font-extrabold text-2xl text-teal-dark">Nova venda</h1>
+        <button id="btn-cardapio" class="tap text-xs text-teal font-medium border border-teal-light bg-teal-light rounded-full px-3 py-1.5">📋 Cardápio</button>
       </div>
 
       <div id="grid-produtos" class="grid grid-cols-2 gap-3 px-5"></div>
@@ -46,7 +47,7 @@ export function renderVenda(root) {
       <button data-id="${p.id}" class="tap produto-btn text-left bg-paper-raised border border-line rounded-2xl p-4 shadow-sm active:shadow-none">
         <div class="font-display font-bold text-sm leading-snug mb-2">${p.nome}</div>
         <div class="tabular text-teal font-semibold">R$ ${fmt(p.preco)}</div>
-        <div class="text-xs text-ink-soft mt-1">estoque: ${p.estoque ?? 0}</div>
+        <div class="text-xs text-ink-soft mt-1">na caixa: ${p.estoqueCaixa ?? 0}</div>
       </button>`
       )
       .join("");
@@ -291,6 +292,16 @@ export function renderVenda(root) {
     });
     overlay.querySelector("#fechar-comprovante").addEventListener("click", () => overlay.remove());
   }
+
+  root.querySelector("#btn-cardapio").addEventListener("click", () => {
+    const disponiveis = produtos.filter((p) => (p.estoqueCaixa ?? 0) > 0);
+    if (disponiveis.length === 0) {
+      alert("Nenhum produto com estoque na caixa agora. Carregue a caixa na aba Produtos primeiro.");
+      return;
+    }
+    const texto = gerarTextoCardapio(disponiveis);
+    compartilharWhatsApp(texto);
+  });
 
   listenProdutos((data) => {
     produtos = data;

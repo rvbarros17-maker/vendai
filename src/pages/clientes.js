@@ -13,6 +13,13 @@ export function renderClientes(root) {
       </div>
       <p class="px-5 text-xs text-ink-soft mb-3">O caderninho digital dos seus fiadores.</p>
 
+      <div class="px-5 mb-4">
+        <div class="bg-coral text-paper rounded-2xl p-4 flex items-center justify-between">
+          <span class="text-sm opacity-90">Total a receber</span>
+          <span id="total-fiado" class="font-display font-extrabold text-2xl tabular">R$ 0,00</span>
+        </div>
+      </div>
+
       <div id="caderninho" class="mx-4 bg-paper-raised border border-line rounded-2xl shadow-sm overflow-hidden">
         <div id="lista" class="caderninho"></div>
       </div>
@@ -26,8 +33,12 @@ export function renderClientes(root) {
   const lista = root.querySelector("#lista");
   const caderninho = root.querySelector("#caderninho");
   const vazio = root.querySelector("#vazio");
+  const elTotal = root.querySelector("#total-fiado");
 
   function render() {
+    const totalFiado = clientes.reduce((s, c) => s + (c.saldoDevedor || 0), 0);
+    elTotal.textContent = "R$ " + fmt(totalFiado);
+
     if (clientes.length === 0) {
       caderninho.classList.add("hidden");
       vazio.classList.remove("hidden");

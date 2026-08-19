@@ -39,6 +39,19 @@ export function compartilharWhatsApp(texto, telefone) {
   window.open(url, "_blank");
 }
 
+// Gera o texto do mini cardápio com os produtos que têm estoque na caixa.
+export function gerarTextoCardapio(produtosNaCaixa, nomeLoja = "Vendaí") {
+  const linhas = [];
+  linhas.push(`🍦 *${nomeLoja}* — cardápio de hoje`);
+  linhas.push("");
+  produtosNaCaixa.forEach((p) => {
+    linhas.push(`${p.nome} — R$ ${fmt(p.preco)}`);
+  });
+  linhas.push("");
+  linhas.push("Chama no WhatsApp pra encomendar! 😋");
+  return linhas.join("\n");
+}
+
 export function imprimirComprovante(venda, nomeLoja = "Vendaí") {
   const agora = new Date();
   const data = agora.toLocaleDateString("pt-BR");

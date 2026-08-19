@@ -28,7 +28,8 @@ export function addProduto({ nome, preco, estoque }) {
   return addDoc(collection(db, "produtos"), {
     nome,
     preco: Number(preco),
-    estoque: Number(estoque) || 0,
+    estoque: Number(estoque) || 0, // estoque geral (em casa)
+    estoqueCaixa: 0, // estoque que está com você, na caixa, pronto pra vender
     criadoEm: serverTimestamp(),
   });
 }
@@ -39,6 +40,30 @@ export function updateProduto(id, data) {
 
 export function deleteProduto(id) {
   return deleteDoc(doc(db, "produtos", id));
+}
+
+// Move quantidades do estoque geral pra o estoque da caixa.
+// itens = [{ produtoId, quantidade }]
+export async function carregarCaixa(itens) {
+  for (const item of itens) {
+    if (!item.quantidade) continue;
+    await updateDoc(doc(db, "produtos", item.produtoId), {
+      estoque: increment(-item.quantidade),
+      estoqueCaixa: increment(item.quantidade),
+    });
+  }
+}
+
+// Devolve tudo que sobrou na caixa de volta pro estoque geral.
+// produtos = lista de produtos atuais (com id e estoqueCaixa)
+export async function devolverSobra(produtos) {
+  for (const p of produtos) {
+    if (!p.estoqueCaixa) continue;
+    await updateDoc(doc(db, "produtos", p.id), {
+      estoque: increment(p.estoqueCaixa),
+      estoqueCaixa: increment(-p.estoqueCaixa),
+    });
+  }
 }
 
 /* ---------- CLIENTES / FIADO ---------- */
@@ -102,12 +127,16 @@ export async function registrarPagamento(clienteId, valor) {
 
 /* ---------- VENDAS ---------- */
 
-export function listenVendasDoDia(cb) {
-  const inicio = new Date();
+// data: objeto Date qualquer dentro do dia desejado (padrão: hoje)
+export function listenVendasDoDia(cb, data = new Date()) {
+  const inicio = new Date(data);
   inicio.setHours(0, 0, 0, 0);
+  const fim = new Date(data);
+  fim.setHours(23, 59, 59, 999);
   const q = query(
     collection(db, "vendas"),
     where("data", ">=", Timestamp.fromDate(inicio)),
+    where("data", "<=", Timestamp.fromDate(fim)),
     orderBy("data", "desc")
   );
   return onSnapshot(q, (snap) => {
@@ -133,7 +162,7 @@ export async function registrarVenda(venda) {
   for (const item of venda.itens) {
     if (item.produtoId) {
       updateDoc(doc(db, "produtos", item.produtoId), {
-        estoque: increment(-item.qtd),
+        estoqueCaixa: increment(-item.qtd),
       }).catch(() => {});
     }
   }
@@ -176,7 +205,7 @@ export async function estornarVenda(venda) {
   for (const item of venda.itens) {
     if (item.produtoId) {
       updateDoc(doc(db, "produtos", item.produtoId), {
-        estoque: increment(item.qtd),
+        estoqueCaixa: increment(item.qtd),
       }).catch(() => {});
     }
   }

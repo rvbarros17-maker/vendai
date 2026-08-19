@@ -3,11 +3,44 @@ import { listenVendasDoDia, estornarVenda, marcarVendaPaga } from "../js/db.js";
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 const formaLabel = { dinheiro: "Dinheiro", pix: "Pix", cartao: "Cartão", fiado: "Fiado" };
 
+function paraInputDate(d) {
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const dia = String(d.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function ehHoje(d) {
+  const hoje = new Date();
+  return d.toDateString() === hoje.toDateString();
+}
+
+function formatarLabel(d) {
+  if (ehHoje(d)) return "Hoje";
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  if (d.toDateString() === ontem.toDateString()) return "Ontem";
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
+}
+
 export function renderCaixa(root) {
+  let dataSelecionada = new Date();
+  let unsubscribe = null;
+  let vendasAtuais = [];
+
   root.innerHTML = `
     <div class="flex-1 pb-24">
-      <div class="px-5 pt-2 pb-4">
-        <h1 class="font-display font-extrabold text-2xl text-teal-dark">Caixa do dia</h1>
+      <div class="px-5 pt-2 pb-3">
+        <h1 class="font-display font-extrabold text-2xl text-teal-dark">Caixa</h1>
+      </div>
+
+      <div class="px-5 flex items-center gap-2 mb-4">
+        <button id="dia-anterior" class="tap w-9 h-9 rounded-full bg-paper-raised border border-line flex items-center justify-center text-ink-soft">‹</button>
+        <div class="flex-1 flex items-center gap-2 bg-paper-raised border border-line rounded-xl px-3 py-2">
+          <span id="label-data" class="text-sm font-medium flex-1">Hoje</span>
+          <input id="input-data" type="date" class="text-xs text-ink-soft bg-transparent outline-none" />
+        </div>
+        <button id="dia-seguinte" class="tap w-9 h-9 rounded-full bg-paper-raised border border-line flex items-center justify-center text-ink-soft">›</button>
       </div>
 
       <div class="px-5 grid grid-cols-3 gap-2 mb-5">
@@ -25,21 +58,22 @@ export function renderCaixa(root) {
         </div>
       </div>
 
-      <div class="px-5 mb-2 text-xs font-medium text-ink-soft">Vendas de hoje</div>
+      <div class="px-5 mb-2 text-xs font-medium text-ink-soft">Vendas</div>
       <div id="lista" class="px-5 space-y-2"></div>
       <div id="vazio" class="hidden px-5 py-10 text-center text-ink-soft text-sm">
-        Nenhuma venda registrada hoje ainda.
+        Nenhuma venda registrada nesse dia.
       </div>
     </div>
   `;
-
-  let vendasAtuais = [];
 
   const lista = root.querySelector("#lista");
   const vazio = root.querySelector("#vazio");
   const elRealizado = root.querySelector("#total-realizado");
   const elPago = root.querySelector("#total-pago");
   const elPendente = root.querySelector("#total-pendente");
+  const labelData = root.querySelector("#label-data");
+  const inputData = root.querySelector("#input-data");
+  const btnProximo = root.querySelector("#dia-seguinte");
 
   function abrirEstorno(venda) {
     const overlay = document.createElement("div");
@@ -83,81 +117,109 @@ export function renderCaixa(root) {
     });
   }
 
-  listenVendasDoDia((vendas) => {
-    vendasAtuais = vendas;
+  function carregarDia() {
+    labelData.textContent = formatarLabel(dataSelecionada);
+    inputData.value = paraInputDate(dataSelecionada);
+    btnProximo.disabled = ehHoje(dataSelecionada);
+    btnProximo.classList.toggle("opacity-30", ehHoje(dataSelecionada));
 
-    if (vendas.length === 0) {
-      lista.classList.add("hidden");
-      vazio.classList.remove("hidden");
-    } else {
-      vazio.classList.add("hidden");
-      lista.classList.remove("hidden");
-    }
+    if (unsubscribe) unsubscribe();
+    unsubscribe = listenVendasDoDia((vendas) => {
+      vendasAtuais = vendas;
 
-    const ativas = vendas.filter((v) => !v.estornada);
-    const totalRealizado = ativas.reduce((s, v) => s + v.total, 0);
-    const totalPendente = ativas
-      .filter((v) => v.status === "pendente")
-      .reduce((s, v) => s + v.total, 0);
-    const totalPago = totalRealizado - totalPendente;
-    elRealizado.textContent = "R$ " + fmt(totalRealizado);
-    elPago.textContent = "R$ " + fmt(totalPago);
-    elPendente.textContent = "R$ " + fmt(totalPendente);
+      if (vendas.length === 0) {
+        lista.classList.add("hidden");
+        vazio.classList.remove("hidden");
+      } else {
+        vazio.classList.add("hidden");
+        lista.classList.remove("hidden");
+      }
 
-    lista.innerHTML = vendas
-      .map((v) => {
-        const hora = v.data?.toDate
-          ? v.data.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-          : "--:--";
-        if (v.estornada) {
-          return `
-      <div class="bg-paper border border-line border-dashed rounded-2xl p-4 flex items-center justify-between opacity-60">
-        <div>
-          <div class="text-sm font-medium line-through">${v.itens.length} item(ns) · ${hora}</div>
-          <div class="text-xs text-ink-soft mt-0.5">estornada</div>
-        </div>
-        <span class="tabular font-semibold text-sm text-ink-soft line-through">R$ ${fmt(v.total)}</span>
-      </div>`;
-        }
-        return `
-      <div class="bg-paper-raised border border-line rounded-2xl p-4 flex items-center justify-between">
-        <div>
-          <div class="text-sm font-medium">${v.itens.length} item(ns) · ${hora}</div>
-          <div class="text-xs text-ink-soft mt-0.5">${formaLabel[v.formaPagamento] || v.formaPagamento}${
-          v.status === "pendente" ? " · pendente" : ""
-        }</div>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="tabular font-semibold text-sm ${v.status === "pendente" ? "text-coral" : "text-teal"}">R$ ${fmt(v.total)}</span>
-          <div class="flex flex-col items-end gap-1">
-            ${
-              v.status === "pendente"
-                ? `<button data-id="${v.id}" class="pagar-btn text-xs text-teal underline">marcar paga</button>`
-                : ""
-            }
-            <button data-id="${v.id}" class="estornar-btn text-xs text-ink-soft underline">estornar</button>
+      const ativas = vendas.filter((v) => !v.estornada);
+      const totalRealizado = ativas.reduce((s, v) => s + v.total, 0);
+      const totalPendente = ativas
+        .filter((v) => v.status === "pendente")
+        .reduce((s, v) => s + v.total, 0);
+      const totalPago = totalRealizado - totalPendente;
+      elRealizado.textContent = "R$ " + fmt(totalRealizado);
+      elPago.textContent = "R$ " + fmt(totalPago);
+      elPendente.textContent = "R$ " + fmt(totalPendente);
+
+      lista.innerHTML = vendas
+        .map((v) => {
+          const hora = v.data?.toDate
+            ? v.data.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+            : "--:--";
+          if (v.estornada) {
+            return `
+        <div class="bg-paper border border-line border-dashed rounded-2xl p-4 flex items-center justify-between opacity-60">
+          <div>
+            <div class="text-sm font-medium line-through">${v.itens.length} item(ns) · ${hora}</div>
+            <div class="text-xs text-ink-soft mt-0.5">estornada</div>
           </div>
-        </div>
-      </div>`;
-      })
-      .join("");
+          <span class="tabular font-semibold text-sm text-ink-soft line-through">R$ ${fmt(v.total)}</span>
+        </div>`;
+          }
+          return `
+        <div class="bg-paper-raised border border-line rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium">${v.itens.length} item(ns) · ${hora}</div>
+            <div class="text-xs text-ink-soft mt-0.5">${formaLabel[v.formaPagamento] || v.formaPagamento}${
+            v.status === "pendente" ? " · pendente" : ""
+          }</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="tabular font-semibold text-sm ${v.status === "pendente" ? "text-coral" : "text-teal"}">R$ ${fmt(v.total)}</span>
+            <div class="flex flex-col items-end gap-1">
+              ${
+                v.status === "pendente"
+                  ? `<button data-id="${v.id}" class="pagar-btn text-xs text-teal underline">marcar paga</button>`
+                  : ""
+              }
+              <button data-id="${v.id}" class="estornar-btn text-xs text-ink-soft underline">estornar</button>
+            </div>
+          </div>
+        </div>`;
+        })
+        .join("");
 
-    lista.querySelectorAll(".estornar-btn").forEach((b) =>
-      b.addEventListener("click", () => abrirEstorno(vendasAtuais.find((v) => v.id === b.dataset.id)))
-    );
-    lista.querySelectorAll(".pagar-btn").forEach((b) =>
-      b.addEventListener("click", async () => {
-        b.textContent = "salvando...";
-        b.disabled = true;
-        try {
-          await marcarVendaPaga(vendasAtuais.find((v) => v.id === b.dataset.id));
-        } catch (err) {
-          console.error(err);
-          alert("Não foi possível marcar como paga: " + (err.message || err));
-          b.textContent = "marcar paga";
-          b.disabled = false;
-        }
-      })
-    );
+      lista.querySelectorAll(".estornar-btn").forEach((b) =>
+        b.addEventListener("click", () => abrirEstorno(vendasAtuais.find((v) => v.id === b.dataset.id)))
+      );
+      lista.querySelectorAll(".pagar-btn").forEach((b) =>
+        b.addEventListener("click", async () => {
+          b.textContent = "salvando...";
+          b.disabled = true;
+          try {
+            await marcarVendaPaga(vendasAtuais.find((v) => v.id === b.dataset.id));
+          } catch (err) {
+            console.error(err);
+            alert("Não foi possível marcar como paga: " + (err.message || err));
+            b.textContent = "marcar paga";
+            b.disabled = false;
+          }
+        })
+      );
+    }, dataSelecionada);
+  }
+
+  root.querySelector("#dia-anterior").addEventListener("click", () => {
+    dataSelecionada = new Date(dataSelecionada);
+    dataSelecionada.setDate(dataSelecionada.getDate() - 1);
+    carregarDia();
   });
+  btnProximo.addEventListener("click", () => {
+    if (ehHoje(dataSelecionada)) return;
+    dataSelecionada = new Date(dataSelecionada);
+    dataSelecionada.setDate(dataSelecionada.getDate() + 1);
+    carregarDia();
+  });
+  inputData.addEventListener("change", (e) => {
+    if (!e.target.value) return;
+    const [ano, mes, dia] = e.target.value.split("-").map(Number);
+    dataSelecionada = new Date(ano, mes - 1, dia);
+    carregarDia();
+  });
+
+  carregarDia();
 }
