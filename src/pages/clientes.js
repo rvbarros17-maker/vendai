@@ -1,9 +1,12 @@
 import { listenClientes, addCliente, updateCliente, registrarPagamento } from "../js/db.js";
+import { gerarTextoCobranca, compartilharWhatsApp } from "../js/comprovante.js";
+import { listenConfigLoja } from "../js/config.js";
 
 const fmt = (n) => Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
 export function renderClientes(root) {
   let clientes = [];
+  let configLoja = { nomeLoja: "Vendaí", chavePix: "" };
 
   root.innerHTML = `
     <div class="flex-1 pb-24">
@@ -52,11 +55,18 @@ export function renderClientes(root) {
         return `
       <div class="flex items-center justify-between pl-9 pr-4" style="height:28px;">
         <span class="text-sm truncate ${deve ? "font-medium" : "text-ink-soft"}">${c.nome}</span>
-        <button data-id="${c.id}" class="ver-cliente tabular text-sm font-semibold ${
+        <div class="flex items-center gap-2">
+          ${
+            deve
+              ? `<button data-id="${c.id}" class="cobrar-btn text-sm" title="Cobrar no WhatsApp">📲</button>`
+              : ""
+          }
+          <button data-id="${c.id}" class="ver-cliente tabular text-sm font-semibold ${
           deve ? "text-coral" : "text-teal"
         }">
-          ${deve ? "R$ " + fmt(c.saldoDevedor) : "quite"}
-        </button>
+            ${deve ? "R$ " + fmt(c.saldoDevedor) : "quite"}
+          </button>
+        </div>
       </div>`;
       })
       .join("");
@@ -64,6 +74,18 @@ export function renderClientes(root) {
     lista.querySelectorAll(".ver-cliente").forEach((b) =>
       b.addEventListener("click", () => abrirCliente(clientes.find((c) => c.id === b.dataset.id)))
     );
+    lista.querySelectorAll(".cobrar-btn").forEach((b) =>
+      b.addEventListener("click", () => cobrar(clientes.find((c) => c.id === b.dataset.id)))
+    );
+  }
+
+  function cobrar(cliente) {
+    if (!cliente.telefone) {
+      alert("Esse cliente não tem telefone cadastrado. Toca em editar pra adicionar antes de cobrar.");
+      return;
+    }
+    const texto = gerarTextoCobranca(cliente, configLoja.chavePix, configLoja.nomeLoja);
+    compartilharWhatsApp(texto, cliente.telefone);
   }
 
   function abrirCliente(cliente) {
@@ -88,7 +110,10 @@ export function renderClientes(root) {
             ? `
         <label class="text-xs font-medium text-ink-soft">Registrar pagamento (R$)</label>
         <input id="f-pagamento" type="number" step="0.01" class="w-full border border-line rounded-xl px-3 py-2 mb-3 mt-1 bg-paper text-sm tabular" placeholder="0,00" />
-        <button id="pagar-total" class="text-xs text-teal font-medium mb-4 underline">pagar tudo (R$ ${fmt(cliente.saldoDevedor)})</button>
+        <div class="flex items-center justify-between mb-4">
+          <button id="pagar-total" class="text-xs text-teal font-medium underline">pagar tudo (R$ ${fmt(cliente.saldoDevedor)})</button>
+          <button id="cobrar-whatsapp" class="text-xs text-teal font-medium underline">📲 cobrar no WhatsApp</button>
+        </div>
         `
             : `<p class="text-sm text-ink-soft mb-4">Sem pendências. 🎉</p>`
         }
@@ -111,6 +136,7 @@ export function renderClientes(root) {
     overlay.querySelector("#pagar-total")?.addEventListener("click", () => {
       overlay.querySelector("#f-pagamento").value = cliente.saldoDevedor;
     });
+    overlay.querySelector("#cobrar-whatsapp")?.addEventListener("click", () => cobrar(cliente));
     overlay.querySelector("#confirmar-pagamento")?.addEventListener("click", async () => {
       const valor = Number(overlay.querySelector("#f-pagamento").value);
       if (!valor || valor <= 0) {
@@ -195,5 +221,8 @@ export function renderClientes(root) {
   listenClientes((data) => {
     clientes = data;
     render();
+  });
+  listenConfigLoja((data) => {
+    configLoja = data;
   });
 }

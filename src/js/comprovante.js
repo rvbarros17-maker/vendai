@@ -44,6 +44,24 @@ export function compartilharWhatsApp(texto, telefone) {
   window.open(url, "_blank");
 }
 
+// Gera mensagem de cobrança amigável pro cliente fiado.
+export function gerarTextoCobranca(cliente, chavePix = "", nomeLoja = "Vendaí") {
+  const linhas = [];
+  linhas.push(`Oi, ${cliente.nome}! Aqui é da ${nomeLoja} 😊`);
+  linhas.push("");
+  linhas.push(
+    `Passando só pra lembrar que está pendente um valor de *R$ ${fmt(cliente.saldoDevedor)}* das compras fiado.`
+  );
+  if (chavePix) {
+    linhas.push("");
+    linhas.push("Chave Pix pra pagamento (copie e cole no banco):");
+    linhas.push(chavePix);
+  }
+  linhas.push("");
+  linhas.push("Qualquer dúvida, é só chamar por aqui. Obrigado! 🍦");
+  return linhas.join("\n");
+}
+
 // Gera o texto do mini cardápio com os produtos que têm estoque na caixa.
 export function gerarTextoCardapio(produtosNaCaixa, nomeLoja = "Vendaí") {
   const linhas = [];
