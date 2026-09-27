@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Sora", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "Space Grotesk", monospace;
+
+  --color-ink: #1c2321;
+  --color-ink-soft: #4a5350;
+  --color-paper: #f7f1e6;
+  --color-paper-raised: #fffdf8;
+  --color-teal: #0f5c56;
+  --color-teal-dark: #0a3f3b;
+  --color-teal-light: #dceee8;
+  --color-coral: #e8623d;
+  --color-coral-light: #fbe3da;
+  --color-line: #d8cbb0;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Notebook "caderninho" texture for the fiado ledger */
+.caderninho {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    var(--color-line) 28px
+  );
+  background-position: 0 8px;
+  position: relative;
+}
+
+.caderninho::before {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-coral);
+  opacity: 0.35;
+}
+
+.stitch {
+  background-image: radial-gradient(circle, var(--color-line) 1.2px, transparent 1.2px);
+  background-size: 10px 10px;
+}
+
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle press feedback on tap targets — feels native on mobile */
+.tap {
+  transition: transform 0.08s ease, opacity 0.08s ease;
+}
+.tap:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tap { transition: none; }
+  .tap:active { transform: none; }
+}
