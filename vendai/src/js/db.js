@@ -42,6 +42,14 @@ export function deleteProduto(id) {
   return deleteDoc(doc(db, "produtos", id));
 }
 
+// Soma ou subtrai (delta positivo/negativo) de um dos estoques do produto.
+// campo = "estoque" (geral) ou "estoqueCaixa"
+export function ajustarEstoque(produtoId, campo, delta) {
+  return updateDoc(doc(db, "produtos", produtoId), {
+    [campo]: increment(Number(delta)),
+  });
+}
+
 // Move quantidades do estoque geral pra o estoque da caixa.
 // itens = [{ produtoId, quantidade }]
 export async function carregarCaixa(itens) {
